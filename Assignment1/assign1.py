@@ -10,10 +10,10 @@ app = FastAPI()
 
 # Configure database connection (MySQL)
 database = "assignment1"
-user = "test_Assign"
-password = "test1234"
-host = "203.159.94.146"
-port = "6033"
+user = "-"
+password = "-"
+host = "-"
+port = "3306"
 conn = mysql.connector.connect(
     host=host, port=port, user=user, password=password, database=database
 )
@@ -56,9 +56,22 @@ class CheckWorkOrderRequest(BaseModel):
 # Create work-orders
 @app.post("/work-orders", response_model=CheckWorkOrderRequest)
 def create_work_order(work_order: CreateWorkOrderRequest):
+    
     try:
+        # Check if work order number is duplicate
         cursor = conn.cursor()
-        query = """
+        query = "SELECT id FROM work_orders WHERE work_order_number = %s"
+        cursor.execute(query, (work_order.work_order_number,))
+        if cursor.fetchone():
+            cursor.close()
+            raise HTTPException(
+                status_code=400, detail="Work order number already exists"
+            )
+        cursor.close()
+
+        # Create work order
+        cursor = conn.cursor()
+        insert_query = """
         INSERT INTO work_orders (
             work_order_number, created_by, assigned_to, room,
             started_at, finished_at, type, status
@@ -67,7 +80,7 @@ def create_work_order(work_order: CreateWorkOrderRequest):
             %(started_at)s, %(finished_at)s, %(type)s, %(status)s
         )
         """
-        cursor.execute(query, work_order.dict())
+        cursor.execute(insert_query, work_order.dict())
         conn.commit()
         work_order_id = cursor.lastrowid
         cursor.close()
@@ -83,6 +96,7 @@ def create_work_order(work_order: CreateWorkOrderRequest):
 #  Update work-orders by id
 @app.put("/work-orders/{work_order_id}", response_model=CheckWorkOrderRequest)
 def update_work_order(work_order_id: int, work_order: UpdateWorkOrderRequest):
+    
     try:
         cursor = conn.cursor()
         query = """
